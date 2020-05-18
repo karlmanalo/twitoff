@@ -25,7 +25,7 @@ def parse_records(database_records):
         [
             {"id": 1, "title": "Book 1"},
             {"id": 2, "title": "Book 2"},
-            {"id": 3, "title": "Book 3"},
+            {"id": 3, "title": "Book 3"}
         ]
     """
     parsed_records = []
