@@ -1,0 +1,4 @@
+
+# ignore dev database stuff:
+migrations/
+twitoff_development.db
