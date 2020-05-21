@@ -1,56 +1,66 @@
-# web_app/routes/twitter_routes.py
+# web_app/routes/stats_routes.py
 
-from flask import Blueprint, render_template, jsonify
+from flask import Blueprint, request, jsonify, render_template
 
-from web_app.services.twitter_service import api as twitter_api
+from sklearn.linear_model import LogisticRegression # for example
+
+from web_app.models import User, Tweet
 from web_app.services.basilica_service import connection as basilica_connection
-from web_app.models import User, Tweet, db
 
-twitter_routes = Blueprint("twitter_routes", __name__)
+stats_routes = Blueprint("stats_routes", __name__)
 
-@twitter_routes.route("/users/<screen_name>")
-def get_user(screen_name=None):
-    print(screen_name)
+@stats_routes.route("/predict", methods=["POST"])
+def predict():
+    print("PREDICT ROUTE...")
+    print("FORM DATA:", dict(request.form))
+    #> {'screen_name_a': 'elonmusk', 'screen_name_b': 's2t2', 'tweet_text': 'Example tweet text here'}
+    screen_name_a = request.form["screen_name_a"]
+    screen_name_b = request.form["screen_name_b"]
+    tweet_text = request.form["tweet_text"]
 
-    twitter_user = twitter_api.get_user(screen_name)
-    #statuses = twitter_api.user_timeline(screen_name, tweet_mode="extended", count=150, exclude_replies=True, include_rts=False)
-    statuses = twitter_api.user_timeline(screen_name, tweet_mode="extended", count=150)
-    #return jsonify({
-    #    "user": user._json,
-    #    "tweets": [status.full_text for status in statuses]
-    #})
+    print("-----------------")
+    print("FETCHING TWEETS FROM THE DATABASE...")
+    # todo: wrap in a try block in case the user's don't exist in the database
 
-    # get existing user from the db or initialize a new one:
-    db_user = User.query.get(twitter_user.id) or User(id=twitter_user.id)
-    db_user.screen_name = twitter_user.screen_name
-    db_user.name = twitter_user.name
-    db_user.location = twitter_user.location
-    db_user.followers_count = twitter_user.followers_count
-    db.session.add(db_user)
-    db.session.commit()
-    #return "OK"
-    #breakpoint()
+    # f"SELECT * FROM users WHERE screen_name = {screen_name_a}"
 
+    user_a = User.query.filter_by(screen_name = screen_name_a).one()
+    user_b = User.query.filter_by(screen_name = screen_name_b).one()
+    user_a_tweets = user_a.tweets # Tweet.query.filter_by(user_id = user_a.id).one()
+    user_b_tweets = user_b.tweets # Tweet.query.filter_by(user_id = user_b.id).one()
+    #user_a_embeddings = [tweet.embedding for tweet in user_a_tweets]
+    #user_b_embeddings = [tweet.embedding for tweet in user_b_tweets]
+    print("USER A", user_a.screen_name, len(user_a.tweets))
+    print("USER B", user_b.screen_name, len(user_b.tweets))
 
-    all_tweet_texts = [status.full_text for status in statuses]
-    embeddings = list(basilica_connection.embed_sentences(all_tweet_texts, model="twitter"))
-    print("NUMBER OF EMBEDDINGS", len(embeddings))
+    print("-----------------")
+    print("TRAINING THE MODEL...")
+    embeddings = []
+    labels = []
 
-    counter = 0
-    for status in statuses:
-        print(status.full_text)
-        print("----")
-        #print(dir(status))
-        # get existing tweet from the db or initialize a new one:
-        db_tweet = Tweet.query.get(status.id) or Tweet(id=status.id)
-        db_tweet.user_id = status.author.id # or db_user.id
-        db_tweet.full_text = status.full_text
-        #embedding = basilica_connection.embed_sentence(status.full_text, model="twitter") # todo: prefer to make a single request to basilica with all the tweet texts, instead of a request per tweet
-        db_tweet.embedding = embeddings[counter]
-        db.session.add(db_tweet)
-        counter+=1
-    db.session.commit()
-    #breakpoint()
+    for tweet in user_a_tweets:
+        embeddings.append(tweet.embedding)
+        labels.append(user_a.screen_name)
 
-    return "OK"
-    #return render_template("user.html", user=db_user, tweets=statuses) # tweets=db_tweets
+    for tweet in user_b_tweets:
+        embeddings.append(tweet.embedding)
+        labels.append(user_b.screen_name)
+
+    classifier = LogisticRegression() # for example
+    classifier.fit(embeddings, labels)
+
+    print("-----------------")
+    print("MAKING A PREDICTION...")
+    #result_a = classifier.predict([user_a_tweets[0].embedding])
+    #result_b = classifier.predict([user_b_tweets[0].embedding])
+    #results = classifier.predict([embeddings[0]])[0] #> elon
+
+    example_embedding = basilica_connection.embed_sentence(tweet_text, model="twitter")
+    result = classifier.predict([example_embedding])
+
+    return render_template("prediction_results.html",
+        screen_name_a=screen_name_a,
+        screen_name_b=screen_name_b,
+        tweet_text=tweet_text,
+        screen_name_most_likely= result[0]
+    )
