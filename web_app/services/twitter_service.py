@@ -3,6 +3,7 @@
 import tweepy
 import os
 from dotenv import load_dotenv
+from pprint import pprint
 
 load_dotenv()
 
@@ -11,30 +12,51 @@ TWITTER_API_SECRET = os.getenv("TWITTER_API_SECRET")
 TWITTER_ACCESS_TOKEN = os.getenv("TWITTER_ACCESS_TOKEN")
 TWITTER_ACCESS_TOKEN_SECRET = os.getenv("TWITTER_ACCESS_TOKEN_SECRET")
 
-def twitter_api():
-    auth = tweepy.OAuthHandler(TWITTER_API_KEY, TWITTER_API_SECRET)
-    auth.set_access_token(TWITTER_ACCESS_TOKEN, TWITTER_ACCESS_TOKEN_SECRET)
-    print("AUTH", auth)
-    api = tweepy.API(auth)
-    print("API", api)
-    #print(dir(api))
-    return api
+#class TwitterService():
+#    def __init__(self):
+#        self.auth = _________
+#        self.api = _________
+#
+#service = TwitterService()
+#service.api.get_user("_______")
+
+auth = tweepy.OAuthHandler(TWITTER_API_KEY, TWITTER_API_SECRET)
+auth.set_access_token(TWITTER_ACCESS_TOKEN, TWITTER_ACCESS_TOKEN_SECRET)
+print("AUTH", auth)
+
+api = tweepy.API(auth)
+print("API", api)
+#print(dir(api))
 
 if __name__ == "__main__":
 
-    api = twitter_api()
-    user = api.get_user("elonmusk")
-    print("USER", user)
+    screen_name = input("Please input a twitter screen name (e.g. s2t2): ")
+
+    #
+    # how to get information about a given twitter user?
+    #
+
+    user = api.get_user(screen_name)
+    #> <class 'tweepy.models.User'>
+
+    #pprint(user._json)
+    print(user.id)
     print(user.screen_name)
-    print(user.name)
+    print(user.friends_count)
     print(user.followers_count)
 
-    #breakpoint()
-
-    #public_tweets = api.home_timeline()
     #
-    #for tweet in public_tweets:
-    #    print(type(tweet)) #> <class 'tweepy.models.Status'>
-    #    #print(dir(tweet))
-    #    print(tweet.text)
-    #    print("-------------")
+    # how to get tweets from a given twitter user?
+    #
+
+    #statuses = api.user_timeline("s2t2")
+    statuses = api.user_timeline(screen_name, tweet_mode="extended", count=150, exclude_replies=True, include_rts=False)
+    #status = statuses[0]
+    #pprint(dir(status))
+    #pprint(status._json)
+    #print(status.id)
+    #print(status.full_text)
+
+    for status in statuses:
+        print("----")
+        print(status.full_text)
